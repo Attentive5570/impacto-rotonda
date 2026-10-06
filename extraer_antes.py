@@ -27,6 +27,7 @@ ARCHIVO_CSV = "historico_antes.csv"
 COLUMNAS = ["fecha", "hora", "sentido", "dia_semana", "es_hora_pico", "distancia_km",
             "tiempo_viaje_minutos", "tiempo_sin_trafico_minutos", "fecha_extraccion"]
 PAUSA_SEGUNDOS = 1
+MAX_ERRORES_SEGUIDOS = 5  # si fallan 5 seguidas, se detiene y muestra el error
 
 
 def dias_laborales(meses):
@@ -83,6 +84,7 @@ def main():
     hoy = datetime.now(ZONA_HORARIA).date().isoformat()
 
     errores = 0
+    seguidos = 0
     with open(ARCHIVO_CSV, "a", newline="", encoding="utf-8") as f:
         escritor = csv.DictWriter(f, fieldnames=COLUMNAS)
         if nuevo:
@@ -95,9 +97,12 @@ def main():
                 datos = consultar_ruta(salida, sentido)
             except Exception as e:  # no detener: lo guardado se conserva
                 errores += 1
+                seguidos += 1
                 print(f"[{i}/{len(muestras)}] ERROR {dia} {hora} {sentido}: {e}")
                 if "GOOGLE_MAPS_API_KEY" in str(e):
                     sys.exit(1)
+                if seguidos >= MAX_ERRORES_SEGUIDOS:
+                    sys.exit(f"Se detiene: {seguidos} errores seguidos. Revisa el último mensaje de error.")
                 time.sleep(PAUSA_SEGUNDOS)
                 continue
 
@@ -105,6 +110,7 @@ def main():
                                "dia_semana": DIAS[dia.weekday()], "es_hora_pico": es_pico, **datos,
                                "fecha_extraccion": hoy})
             f.flush()
+            seguidos = 0
             print(f"[{i}/{len(muestras)}] {dia} {hora} {sentido} -> {datos}")
             time.sleep(PAUSA_SEGUNDOS)
 
