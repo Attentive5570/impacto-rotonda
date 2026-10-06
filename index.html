@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rotonda Carchá–Cobán: antes y después</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --asfalto: #22262B;
+    --linea: #F2C200;
+    --fondo: #E8EAEC;
+    --papel: #F7F8F8;
+    --texto: #1B1E22;
+    --tenue: #5C636C;
+    --mejor: #0B7A6B;
+    --peor: #B8322A;
+    --antes: #8D949C;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--texto);
+    font-family: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 17px;
+    line-height: 1.5;
+  }
+  .num { font-family: "Barlow Condensed", "Arial Narrow", sans-serif; font-weight: 700; letter-spacing: 0.01em; }
+
+  header {
+    background: var(--asfalto);
+    color: #fff;
+    padding: 36px 20px 32px;
+    border-bottom: 6px dashed var(--linea);
+  }
+  .contenedor { max-width: 760px; margin: 0 auto; }
+  header h1 {
+    font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.4rem, 9vw, 3.8rem);
+    line-height: 1.02;
+    margin: 0 0 10px;
+  }
+  header p { margin: 0; color: #C5CAD0; max-width: 52ch; }
+
+  main { padding: 28px 20px 48px; }
+  section { margin-bottom: 40px; }
+  h2 {
+    font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+    font-size: 1.7rem;
+    margin: 0 0 4px;
+  }
+  .sub { color: var(--tenue); margin: 0 0 18px; font-size: 0.95rem; }
+
+  .veredicto {
+    background: var(--papel);
+    border-left: 8px solid var(--tenue);
+    padding: 16px 18px;
+    margin-bottom: 36px;
+  }
+  .veredicto.mejor { border-color: var(--mejor); }
+  .veredicto.peor { border-color: var(--peor); }
+  .veredicto strong { display: block; font-size: 1.25rem; line-height: 1.25; margin-bottom: 4px; }
+  .veredicto span { color: var(--tenue); font-size: 0.95rem; }
+
+  /* Un "carril" por franja horaria */
+  .carril {
+    background: var(--papel);
+    padding: 16px 18px 18px;
+    margin-bottom: 14px;
+  }
+  .carril-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .carril-cab h3 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+  .carril-cab small { color: var(--tenue); }
+  .fila { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .fila .et { color: var(--tenue); font-size: 0.9rem; }
+  .pista { position: relative; height: 34px; background: #E3E6E9; }
+  .barra { height: 100%; width: 0; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; transition: width 0.7s ease-out; }
+  .barra.antes {
+    background: repeating-linear-gradient(135deg, var(--antes) 0 8px, #9CA2A9 8px 16px);
+    color: #fff;
+  }
+  .barra.despues { background: var(--linea); color: var(--asfalto); }
+  .barra .num { font-size: 1.3rem; white-space: nowrap; }
+  .sin-dato { color: var(--tenue); font-size: 0.9rem; padding-left: 8px; }
+  .cambio { margin-top: 10px; font-weight: 600; }
+  .cambio.mejor { color: var(--mejor); }
+  .cambio.peor { color: var(--peor); }
+  .cambio.igual { color: var(--tenue); }
+  @media (prefers-reduced-motion: reduce) { .barra { transition: none; } }
+
+  /* Tendencia */
+  .botones { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .botones button {
+    font: inherit; font-size: 0.95rem; font-weight: 600;
+    padding: 9px 14px; border: 2px solid var(--asfalto);
+    background: transparent; color: var(--asfalto); cursor: pointer;
+  }
+  .botones button[aria-pressed="true"] { background: var(--asfalto); color: #fff; }
+  .botones button:focus-visible { outline: 3px solid var(--linea); outline-offset: 2px; }
+  .grafica { background: var(--papel); padding: 12px; }
+  .grafica svg { width: 100%; height: auto; display: block; }
+  .grafica .vacio { padding: 28px 8px; color: var(--tenue); text-align: center; }
+
+  .notas { font-size: 0.92rem; color: var(--tenue); }
+  .notas p { margin: 0 0 10px; max-width: 70ch; }
+  footer { font-size: 0.85rem; color: var(--tenue); padding-top: 12px; border-top: 2px solid #CDD1D5; }
+</style>
+</head>
+<body>
+<header>
+  <div class="contenedor">
+    <h1>¿Funciona la rotonda?</h1>
+    <p>Tiempo de viaje de San Pedro Carchá hacia Cobán, antes y después de la obra.</p>
+  </div>
+</header>
+
+<main class="contenedor">
+  <div id="veredicto" class="veredicto"><strong>Cargando datos…</strong></div>
+
+  <section>
+    <h2>Tiempo de viaje por horario</h2>
+    <p class="sub">Promedio en minutos. Las barras rayadas son el estimado «antes»; las amarillas, lo medido «después».</p>
+    <div id="carriles"></div>
+  </section>
+
+  <section>
+    <h2>Evolución del «después»</h2>
+    <p class="sub">Cada punto es una medición. La línea punteada marca el promedio «antes».</p>
+    <div class="botones" id="botones" role="group" aria-label="Horario"></div>
+    <div class="grafica" id="grafica"></div>
+  </section>
+
+  <section class="notas">
+    <h2>Cómo se obtuvieron los datos</h2>
+    <p><strong>Antes:</strong> estimado por la Routing API de TomTom para los días hábiles de agosto y septiembre de 2026, cuando la rotonda aún no estaba en uso (07:30, 13:00 y 17:30). Es una predicción basada en patrones típicos de tráfico, no una medición observada.</p>
+    <p><strong>Después:</strong> mediciones reales con tráfico en vivo, tomadas de lunes a viernes a esas mismas horas. Se acumulan cada día, así que la comparación mejora con el tiempo.</p>
+    <p>Recorrido único: Carchá → Cobán. La hora de cada medición puede variar unos minutos.</p>
+  </section>
+
+  <footer id="pie"></footer>
+</main>
+
+<script>
+(function () {
+  var FRANJAS = [
+    { id: "manana", nombre: "Hora pico de la mañana", hora: "07:30" },
+    { id: "valle",  nombre: "Hora valle",              hora: "13:00" },
+    { id: "tarde",  nombre: "Hora pico de la tarde",   hora: "17:30" }
+  ];
+
+  function franjaDeHora(h) { return h === "07:30" ? "manana" : h === "13:00" ? "valle" : "tarde"; }
+  function fmt(n) { return n.toFixed(1).replace(".", ","); }
+  function media(a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
+
+  function parse(texto) {
+    var l = texto.trim().split(/\r?\n/);
+    if (l.length < 2) return [];
+    var cab = l[0].split(",").map(function (c) { return c.trim(); });
+    return l.slice(1).filter(Boolean).map(function (linea) {
+      var v = linea.split(","), o = {};
+      cab.forEach(function (k, i) { o[k] = (v[i] || "").trim(); });
+      return o;
+    });
+  }
+
+  function cargar(url) {
+    return fetch(url + "?v=" + Date.now())
+      .then(function (r) { return r.ok ? r.text() : ""; })
+      .then(parse)
+      .catch(function () { return []; });
+  }
+
+  Promise.all([cargar("historico_antes_tomtom.csv"), cargar("datos_despues.csv")]).then(function (res) {
+    var antes = res[0].map(function (r) {
+      return { fecha: r.fecha, franja: franjaDeHora(r.hora), min: parseFloat(r.tiempo_viaje_minutos) };
+    }).filter(function (r) { return isFinite(r.min); });
+
+    var despues = res[1].map(function (r) {
+      return { fecha: r.fecha, hora: r.hora_medicion, franja: r.franja, min: parseFloat(r.tiempo_viaje_minutos) };
+    }).filter(function (r) { return isFinite(r.min); });
+
+    var st = {};
+    FRANJAS.forEach(function (f) {
+      var a = antes.filter(function (r) { return r.franja === f.id; }).map(function (r) { return r.min; });
+      var d = despues.filter(function (r) { return r.franja === f.id; }).map(function (r) { return r.min; });
+      st[f.id] = { a: media(a), na: a.length, d: media(d), nd: d.length };
+    });
+
+    pintarVeredicto(st);
+    pintarCarriles(st);
+    pintarBotones(st, despues);
+    pintarPie(antes, despues);
+  });
+
+  function pintarVeredicto(st) {
+    var deltas = [], pct = [];
+    FRANJAS.forEach(function (f) {
+      var s = st[f.id];
+      if (s.a !== null && s.d !== null) { deltas.push(s.d - s.a); pct.push((s.d - s.a) / s.a * 100); }
+    });
+    var el = document.getElementById("veredicto");
+    if (!deltas.length) {
+      el.innerHTML = "<strong>Aún no hay datos para comparar.</strong><span>La primera medición del «después» aparece tras la siguiente ejecución programada.</span>";
+      return;
+    }
+    var d = media(deltas), p = media(pct);
+    if (Math.abs(p) < 2) {
+      el.className = "veredicto";
+      el.innerHTML = "<strong>Sin cambio claro en el tiempo de viaje.</strong><span>La diferencia promedio es de " + fmt(Math.abs(d)) + " min (" + fmt(Math.abs(p)) + " %).</span>";
+    } else if (d < 0) {
+      el.className = "veredicto mejor";
+      el.innerHTML = "<strong>El viaje tarda " + fmt(Math.abs(d)) + " min menos en promedio (" + fmt(Math.abs(p)) + " %).</strong><span>Comparación entre los horarios que ya tienen datos antes y después.</span>";
+    } else {
+      el.className = "veredicto peor";
+      el.innerHTML = "<strong>El viaje tarda " + fmt(d) + " min más en promedio (" + fmt(p) + " %).</strong><span>Comparación entre los horarios que ya tienen datos antes y después.</span>";
+    }
+  }
+
+  function pintarCarriles(st) {
+    var max = 0;
+    FRANJAS.forEach(function (f) {
+      var s = st[f.id];
+      if (s.a !== null) max = Math.max(max, s.a);
+      if (s.d !== null) max = Math.max(max, s.d);
+    });
+    var cont = document.getElementById("carriles");
+    cont.innerHTML = "";
+
+    FRANJAS.forEach(function (f) {
+      var s = st[f.id];
+      var cambio = "";
+      if (s.a !== null && s.d !== null) {
+        var d = s.d - s.a, p = d / s.a * 100;
+        if (Math.abs(p) < 2) cambio = '<div class="cambio igual">Sin cambio claro (' + fmt(Math.abs(d)) + ' min)</div>';
+        else if (d < 0) cambio = '<div class="cambio mejor">' + fmt(Math.abs(d)) + " min menos (" + fmt(Math.abs(p)) + " %)</div>";
+        else cambio = '<div class="cambio peor">' + fmt(d) + " min más (" + fmt(p) + " %)</div>";
+      }
+      var div = document.createElement("div");
+      div.className = "carril";
+      div.innerHTML =
+        '<div class="carril-cab"><h3>' + f.nombre + "</h3><small>" + f.hora + " · " + s.na + " antes, " + s.nd + " después</small></div>" +
+        '<div class="fila"><span class="et">Antes</span><div class="pista">' + barra("antes", s.a, max) + "</div></div>" +
+        '<div class="fila"><span class="et">Después</span><div class="pista">' + barra("despues", s.d, max) + "</div></div>" +
+        cambio;
+      cont.appendChild(div);
+    });
+
+    // Animar el ancho de las barras una sola vez
+    requestAnimationFrame(function () {
+      document.querySelectorAll(".barra[data-w]").forEach(function (b) { b.style.width = b.getAttribute("data-w") + "%"; });
+    });
+  }
+
+  function barra(tipo, valor, max) {
+    if (valor === null) return '<span class="sin-dato">Sin datos todavía</span>';
+    var w = Math.max(12, valor / max * 100);
+    return '<div class="barra ' + tipo + '" data-w="' + w.toFixed(1) + '"><span class="num">' + fmt(valor) + " min</span></div>";
+  }
+
+  function pintarBotones(st, despues) {
+    var cont = document.getElementById("botones");
+    FRANJAS.forEach(function (f, i) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = f.nombre + " (" + f.hora + ")";
+      b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+      b.addEventListener("click", function () {
+        cont.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+        b.setAttribute("aria-pressed", "true");
+        dibujar(f.id, st, despues);
+      });
+      cont.appendChild(b);
+    });
+    dibujar(FRANJAS[0].id, st, despues);
+  }
+
+  function dibujar(id, st, despues) {
+    var cont = document.getElementById("grafica");
+    var pts = despues.filter(function (r) { return r.franja === id; })
+      .sort(function (a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; });
+    if (!pts.length) { cont.innerHTML = '<div class="vacio">Aún no hay mediciones para este horario.</div>'; return; }
+
+    var base = st[id].a;
+    var W = 640, H = 250, L = 46, R = 16, T = 16, B = 30;
+    var vals = pts.map(function (p) { return p.min; });
+    if (base !== null) vals.push(base);
+    var ymin = Math.floor(Math.min.apply(null, vals) - 1);
+    var ymax = Math.ceil(Math.max.apply(null, vals) + 1);
+    var t0 = Date.parse(pts[0].fecha), t1 = Date.parse(pts[pts.length - 1].fecha);
+
+    function x(p) { return t1 === t0 ? (L + (W - R)) / 2 : L + (Date.parse(p.fecha) - t0) / (t1 - t0) * (W - L - R); }
+    function y(v) { return T + (ymax - v) / (ymax - ymin) * (H - T - B); }
+
+    var s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Evolución del tiempo de viaje después de la rotonda">';
+    s += '<line x1="' + L + '" y1="' + y(ymin) + '" x2="' + (W - R) + '" y2="' + y(ymin) + '" stroke="#B9BEC4"/>';
+    s += '<line x1="' + L + '" y1="' + y(ymax) + '" x2="' + (W - R) + '" y2="' + y(ymax) + '" stroke="#D5D8DC"/>';
+    s += '<text x="' + (L - 6) + '" y="' + (y(ymin) + 4) + '" text-anchor="end" font-size="13" fill="#5C636C">' + ymin + "</text>";
+    s += '<text x="' + (L - 6) + '" y="' + (y(ymax) + 4) + '" text-anchor="end" font-size="13" fill="#5C636C">' + ymax + " min</text>";
+    if (base !== null) {
+      s += '<line x1="' + L + '" y1="' + y(base) + '" x2="' + (W - R) + '" y2="' + y(base) + '" stroke="#5C636C" stroke-width="2" stroke-dasharray="6 5"/>';
+      s += '<text x="' + (W - R) + '" y="' + (y(base) - 6) + '" text-anchor="end" font-size="13" fill="#5C636C">Antes: ' + fmt(base) + " min</text>";
+    }
+    if (pts.length > 1) {
+      s += '<polyline fill="none" stroke="#22262B" stroke-width="2" points="' + pts.map(function (p) { return x(p).toFixed(1) + "," + y(p.min).toFixed(1); }).join(" ") + '"/>';
+    }
+    pts.forEach(function (p) {
+      s += '<circle cx="' + x(p).toFixed(1) + '" cy="' + y(p.min).toFixed(1) + '" r="5" fill="#F2C200" stroke="#22262B" stroke-width="2"><title>' + p.fecha + ": " + fmt(p.min) + " min</title></circle>";
+    });
+    s += '<text x="' + L + '" y="' + (H - 8) + '" font-size="13" fill="#5C636C">' + pts[0].fecha + "</text>";
+    if (pts.length > 1) s += '<text x="' + (W - R) + '" y="' + (H - 8) + '" text-anchor="end" font-size="13" fill="#5C636C">' + pts[pts.length - 1].fecha + "</text>";
+    s += "</svg>";
+    cont.innerHTML = s;
+  }
+
+  function pintarPie(antes, despues) {
+    var ult = despues.length ? despues[despues.length - 1] : null;
+    document.getElementById("pie").textContent =
+      antes.length + " consultas del «antes» · " + despues.length + " mediciones del «después»" +
+      (ult ? " · última medición: " + ult.fecha + " " + ult.hora : "") + ". Datos: TomTom Routing API.";
+  }
+})();
+</script>
+</body>
+</html>
