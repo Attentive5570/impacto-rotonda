@@ -17,6 +17,13 @@ DESTINO = (15.4694, -90.3792)   # Cobán
 # (no en el centro de la isla). Ejemplo: ROTONDA = (15.4800, -90.3300)
 ROTONDA = (15.477889, -90.354111)  # 15°28'40.4"N 90°21'14.8"W
 
+# Punto de la rotonda para el sentido de VUELTA (Cobán -> Carchá). Si la vía está
+# dividida, pon aquí un punto sobre el carril hacia Carchá; si no, deja el mismo.
+ROTONDA_VUELTA = ROTONDA
+
+# ida = Carchá -> rotonda -> Cobán ; vuelta = Cobán -> rotonda -> Carchá
+SENTIDOS = ["ida", "vuelta"]
+
 ZONA_HORARIA = timezone(timedelta(hours=-6))  # Guatemala (UTC-6)
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
@@ -30,9 +37,9 @@ def _segundos(valor):
     return float(str(valor).rstrip("s") or 0)
 
 
-def consultar_ruta(salida=None, reintentos=2):
+def consultar_ruta(salida=None, sentido="ida", reintentos=2):
     """
-    Pide la ruta Carchá -> (rotonda) -> Cobán con tráfico.
+    Pide la ruta con tráfico en el sentido indicado ("ida" o "vuelta").
     salida = datetime con zona horaria para una salida futura (predicción de Google
     basada en su historial de tráfico), o None para salir ahora (tráfico en vivo).
     Devuelve un dict con distancia_km, tiempo_viaje_minutos y tiempo_sin_trafico_minutos.
@@ -40,15 +47,22 @@ def consultar_ruta(salida=None, reintentos=2):
     if not API_KEY:
         raise RuntimeError("Falta la variable de entorno GOOGLE_MAPS_API_KEY.")
 
+    if sentido == "ida":
+        inicio, fin, paso = ORIGEN, DESTINO, ROTONDA
+    elif sentido == "vuelta":
+        inicio, fin, paso = DESTINO, ORIGEN, ROTONDA_VUELTA
+    else:
+        raise ValueError(f"Sentido desconocido: {sentido}")
+
     cuerpo = {
-        "origin": _punto(*ORIGEN),
-        "destination": _punto(*DESTINO),
+        "origin": _punto(*inicio),
+        "destination": _punto(*fin),
         "travelMode": "DRIVE",
         "routingPreference": "TRAFFIC_AWARE_OPTIMAL",
         "trafficModel": "BEST_GUESS",
     }
-    if ROTONDA:
-        cuerpo["intermediates"] = [_punto(*ROTONDA)]
+    if paso:
+        cuerpo["intermediates"] = [_punto(*paso)]
     if salida is not None:
         cuerpo["departureTime"] = salida.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
