@@ -137,9 +137,9 @@
 
   <section class="notas">
     <h2>Cómo se obtuvieron los datos</h2>
-    <p><strong>Antes:</strong> estimado por la Routing API de TomTom para los días hábiles de agosto y septiembre de 2026, cuando la rotonda aún no estaba en uso (07:30, 13:00 y 17:30). Es una predicción basada en patrones típicos de tráfico, no una medición observada.</p>
-    <p><strong>Después:</strong> mediciones reales con tráfico en vivo, tomadas de lunes a viernes a esas mismas horas. Se acumulan cada día, así que la comparación mejora con el tiempo.</p>
-    <p>Recorrido único: Carchá → Cobán. La hora de cada medición puede variar unos minutos.</p>
+    <p><strong>Antes:</strong> estimado por Google Routes API para los días hábiles de agosto y septiembre de 2026, cuando la rotonda aún no estaba en uso (07:30, 13:00 y 17:30). Google no publica datos de fechas pasadas, así que es su predicción basada en el historial de tráfico de la vía, no una medición observada.</p>
+    <p><strong>Después:</strong> mediciones con tráfico en vivo de Google, tomadas de lunes a viernes a esas mismas horas. Se acumulan cada día, así que la comparación mejora con el tiempo.</p>
+    <p>Recorrido único: Carchá → rotonda → Cobán, el mismo en ambos escenarios. La hora de cada medición puede variar unos minutos.</p>
   </section>
 
   <footer id="pie"></footer>
@@ -175,7 +175,7 @@
       .catch(function () { return []; });
   }
 
-  Promise.all([cargar("historico_antes_tomtom.csv"), cargar("datos_despues.csv")]).then(function (res) {
+  Promise.all([cargar("historico_antes.csv"), cargar("datos_despues.csv")]).then(function (res) {
     var antes = res[0].map(function (r) {
       return { fecha: r.fecha, franja: franjaDeHora(r.hora), min: parseFloat(r.tiempo_viaje_minutos) };
     }).filter(function (r) { return isFinite(r.min); });
@@ -321,7 +321,7 @@
     var ult = despues.length ? despues[despues.length - 1] : null;
     document.getElementById("pie").textContent =
       antes.length + " consultas del «antes» · " + despues.length + " mediciones del «después»" +
-      (ult ? " · última medición: " + ult.fecha + " " + ult.hora : "") + ". Datos: TomTom Routing API.";
+      (ult ? " · última medición: " + ult.fecha + " " + ult.hora : "") + ". Datos: Google Routes API.";
   }
 })();
 </script>
