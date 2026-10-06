@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Escenario "Después": tráfico ACTUAL Carchá -> rotonda -> Cobán (Google Routes API)."""
+"""Escenario "Después": tráfico ACTUAL en ambos sentidos, ida y vuelta (Google Routes API)."""
 
 import csv
 import os
 import sys
 from datetime import datetime
 
-from rutas_google import DIAS, ROTONDA, ZONA_HORARIA, consultar_ruta
+from rutas_google import DIAS, ROTONDA, SENTIDOS, ZONA_HORARIA, consultar_ruta
 
 ARCHIVO_CSV = "datos_despues.csv"
-COLUMNAS = ["fecha", "hora_medicion", "franja", "dia_semana", "distancia_km",
+COLUMNAS = ["fecha", "hora_medicion", "franja", "sentido", "dia_semana", "distancia_km",
             "tiempo_viaje_minutos", "tiempo_sin_trafico_minutos", "demora_trafico_minutos"]
 
 
@@ -31,27 +31,34 @@ def main():
         print("AVISO: ROTONDA no está definida en rutas_google.py; la ruta no se fuerza por la rotonda.")
 
     ahora = datetime.now(ZONA_HORARIA)
-    try:
-        datos = consultar_ruta()  # sin hora de salida = tráfico en vivo
-    except Exception as e:
-        sys.exit(f"Error al consultar Google: {e}")
+    filas = []
+    for sentido in SENTIDOS:
+        try:
+            datos = consultar_ruta(sentido=sentido)  # sin hora de salida = tráfico en vivo
+        except Exception as e:
+            print(f"Error al consultar Google ({sentido}): {e}")
+            continue
+        filas.append({
+            "fecha": ahora.date().isoformat(),
+            "hora_medicion": ahora.strftime("%H:%M"),
+            "franja": franja_actual(ahora),
+            "sentido": sentido,
+            "dia_semana": DIAS[ahora.weekday()],
+            **datos,
+            "demora_trafico_minutos": round(datos["tiempo_viaje_minutos"] - datos["tiempo_sin_trafico_minutos"], 2),
+        })
 
-    fila = {
-        "fecha": ahora.date().isoformat(),
-        "hora_medicion": ahora.strftime("%H:%M"),
-        "franja": franja_actual(ahora),
-        "dia_semana": DIAS[ahora.weekday()],
-        **datos,
-        "demora_trafico_minutos": round(datos["tiempo_viaje_minutos"] - datos["tiempo_sin_trafico_minutos"], 2),
-    }
+    if not filas:
+        sys.exit("No se pudo medir ningún sentido.")
 
     nuevo = not os.path.exists(ARCHIVO_CSV)
     with open(ARCHIVO_CSV, "a", newline="", encoding="utf-8") as f:
         escritor = csv.DictWriter(f, fieldnames=COLUMNAS)
         if nuevo:
             escritor.writeheader()
-        escritor.writerow(fila)
-    print(f"Guardado: {fila}")
+        escritor.writerows(filas)
+    for fila in filas:
+        print(f"Guardado: {fila}")
 
 
 if __name__ == "__main__":
