@@ -26,6 +26,7 @@ jobs:
       - name: Consultar Google (escenario Antes)
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          PYTHONUNBUFFERED: "1"   # muestra el avance en el log en tiempo real
         run: python extraer_antes.py
 
       - name: Guardar resultados en el repositorio
@@ -39,5 +40,4 @@ jobs:
             git commit -m "Actualiza escenario Antes"
             git pull --rebase
             git push
-
           fi
