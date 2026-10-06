@@ -1,48 +1,65 @@
-name: Medir escenario Después
+#!/usr/bin/env python3
+"""Escenario "Después": tráfico ACTUAL en ambos sentidos, ida y vuelta (Google Routes API)."""
 
-on:
-  schedule:
-    # Hora de Guatemala (UTC-6) -> UTC. Lunes a viernes.
-    - cron: "30 13 * * 1-5"   # 07:30 hora pico mañana
-    - cron: "0 19 * * 1-5"    # 13:00 hora valle
-    - cron: "30 23 * * 1-5"   # 17:30 hora pico tarde
-  workflow_dispatch:          # también se puede lanzar a mano para probar
+import csv
+import os
+import sys
+from datetime import datetime
 
-permissions:
-  contents: write
+from rutas_google import DIAS, ROTONDA, SENTIDOS, ZONA_HORARIA, consultar_ruta
 
-concurrency:
-  group: datos-rotonda
+ARCHIVO_CSV = "datos_despues.csv"
+COLUMNAS = ["fecha", "hora_medicion", "franja", "sentido", "dia_semana", "distancia_km",
+            "tiempo_viaje_minutos", "tiempo_sin_trafico_minutos", "demora_trafico_minutos"]
 
-jobs:
-  medir:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+def franja_actual(ahora):
+    """
+    GitHub puede retrasar las ejecuciones programadas, por eso se usan rangos:
+    antes de 10:30 = manana (07:30), hasta 15:15 = valle (13:00), después = tarde (17:30).
+    """
+    h = ahora.hour + ahora.minute / 60
+    if h < 10.5:
+        return "manana"
+    if h < 15.25:
+        return "valle"
+    return "tarde"
 
-      - name: Instalar dependencias
-        run: pip install requests
 
-      - name: Consultar tráfico actual
-        env:
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          PYTHONUNBUFFERED: "1"   # muestra el avance en el log en tiempo real
-        run: python extraer_despues.py
+def main():
+    if not ROTONDA:
+        print("AVISO: ROTONDA no está definida en rutas_google.py; la ruta no se fuerza por la rotonda.")
 
-      - name: Guardar medición en el repositorio
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add datos_despues.csv
-          if git diff --staged --quiet; then
-            echo "Sin cambios para guardar."
-          else
-            git commit -m "Nueva medición del escenario Después"
-            git pull --rebase
-            git push
-          fi
+    ahora = datetime.now(ZONA_HORARIA)
+    filas = []
+    for sentido in SENTIDOS:
+        try:
+            datos = consultar_ruta(sentido=sentido)  # sin hora de salida = tráfico en vivo
+        except Exception as e:
+            print(f"Error al consultar Google ({sentido}): {e}")
+            continue
+        filas.append({
+            "fecha": ahora.date().isoformat(),
+            "hora_medicion": ahora.strftime("%H:%M"),
+            "franja": franja_actual(ahora),
+            "sentido": sentido,
+            "dia_semana": DIAS[ahora.weekday()],
+            **datos,
+            "demora_trafico_minutos": round(datos["tiempo_viaje_minutos"] - datos["tiempo_sin_trafico_minutos"], 2),
+        })
+
+    if not filas:
+        sys.exit("No se pudo medir ningún sentido.")
+
+    nuevo = not os.path.exists(ARCHIVO_CSV)
+    with open(ARCHIVO_CSV, "a", newline="", encoding="utf-8") as f:
+        escritor = csv.DictWriter(f, fieldnames=COLUMNAS)
+        if nuevo:
+            escritor.writeheader()
+        escritor.writerows(filas)
+    for fila in filas:
+        print(f"Guardado: {fila}")
+
+
+if __name__ == "__main__":
+    main()
