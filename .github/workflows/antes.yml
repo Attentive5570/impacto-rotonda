@@ -23,20 +23,21 @@ jobs:
       - name: Instalar dependencias
         run: pip install requests
 
-      - name: Consultar TomTom (escenario Antes)
+      - name: Consultar Google (escenario Antes)
         env:
-          TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: python extraer_antes.py
 
       - name: Guardar resultados en el repositorio
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add historico_antes_tomtom.csv
+          git add historico_antes.csv
           if git diff --staged --quiet; then
             echo "Sin cambios para guardar."
           else
             git commit -m "Actualiza escenario Antes"
             git pull --rebase
             git push
+
           fi
