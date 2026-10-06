@@ -15,7 +15,7 @@ DESTINO = (15.4694, -90.3792)   # Cobán
 # Punto por el que la ruta DEBE pasar: la rotonda. Escribe aquí (lat, lon) de un
 # punto sobre la calzada de la rotonda, en el carril que va hacia Cobán
 # (no en el centro de la isla). Ejemplo: ROTONDA = (15.4800, -90.3300)
-ROTONDA = None
+ROTONDA = (15.477889, -90.354111)  # 15°28'40.4"N 90°21'14.8"W
 
 ZONA_HORARIA = timezone(timedelta(hours=-6))  # Guatemala (UTC-6)
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
