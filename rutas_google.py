@@ -77,7 +77,7 @@ def consultar_ruta(salida=None, sentido="ida", reintentos=2):
         try:
             r = requests.post(URL, json=cuerpo, headers=cabeceras, timeout=30)
             if r.status_code == 429:  # cuota o límite de tasa: esperar y reintentar
-                ultimo_error = "429 límite de solicitudes"
+                ultimo_error = f"429 límite de solicitudes | {r.text[:300]}"
                 time.sleep(5 * (intento + 1))
                 continue
             r.raise_for_status()
