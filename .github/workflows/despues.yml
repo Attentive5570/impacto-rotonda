@@ -1,0 +1,47 @@
+name: Medir escenario Después
+
+on:
+  schedule:
+    # Hora de Guatemala (UTC-6) -> UTC. Lunes a viernes.
+    - cron: "30 13 * * 1-5"   # 07:30 hora pico mañana
+    - cron: "0 19 * * 1-5"    # 13:00 hora valle
+    - cron: "30 23 * * 1-5"   # 17:30 hora pico tarde
+  workflow_dispatch:          # también se puede lanzar a mano para probar
+
+permissions:
+  contents: write
+
+concurrency:
+  group: datos-rotonda
+
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Consultar tráfico actual
+        env:
+          TOMTOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
+        run: python extraer_despues.py
+
+      - name: Guardar medición en el repositorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add datos_despues.csv
+          if git diff --staged --quiet; then
+            echo "Sin cambios para guardar."
+          else
+            git commit -m "Nueva medición del escenario Después"
+            git pull --rebase
+            git push
+          fi
