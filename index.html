@@ -94,6 +94,15 @@
   @media (prefers-reduced-motion: reduce) { .barra { transition: none; } }
 
   /* Tendencia */
+  .sentidos { display: flex; gap: 0; margin: -6px 0 24px; }
+  .sentidos button {
+    flex: 1; font: inherit; font-weight: 600; font-size: 1rem;
+    padding: 12px 10px; border: 2px solid var(--asfalto);
+    background: var(--papel); color: var(--asfalto); cursor: pointer;
+  }
+  .sentidos button + button { border-left: none; }
+  .sentidos button[aria-pressed="true"] { background: var(--linea); }
+  .sentidos button:focus-visible { outline: 3px solid var(--asfalto); outline-offset: 2px; }
   .botones { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
   .botones button {
     font: inherit; font-size: 0.95rem; font-weight: 600;
@@ -115,11 +124,12 @@
 <header>
   <div class="contenedor">
     <h1>¿Funciona la rotonda?</h1>
-    <p>Tiempo de viaje de San Pedro Carchá hacia Cobán, antes y después de la obra.</p>
+    <p>Tiempo de viaje entre San Pedro Carchá y Cobán, en ambos sentidos, antes y después de la obra.</p>
   </div>
 </header>
 
 <main class="contenedor">
+  <div class="sentidos" id="sentidos" role="group" aria-label="Sentido del recorrido"></div>
   <div id="veredicto" class="veredicto"><strong>Cargando datos…</strong></div>
 
   <section>
@@ -139,7 +149,7 @@
     <h2>Cómo se obtuvieron los datos</h2>
     <p><strong>Antes:</strong> estimado por Google Routes API para los días hábiles de agosto y septiembre de 2026, cuando la rotonda aún no estaba en uso (07:30, 13:00 y 17:30). Google no publica datos de fechas pasadas, así que es su predicción basada en el historial de tráfico de la vía, no una medición observada.</p>
     <p><strong>Después:</strong> mediciones con tráfico en vivo de Google, tomadas de lunes a viernes a esas mismas horas. Se acumulan cada día, así que la comparación mejora con el tiempo.</p>
-    <p>Recorrido único: Carchá → rotonda → Cobán, el mismo en ambos escenarios. La hora de cada medición puede variar unos minutos.</p>
+    <p>Dos recorridos, iguales en ambos escenarios: ida (Carchá → rotonda → Cobán) y vuelta (Cobán → rotonda → Carchá). La hora de cada medición puede variar unos minutos.</p>
   </section>
 
   <footer id="pie"></footer>
@@ -152,6 +162,12 @@
     { id: "valle",  nombre: "Hora valle",              hora: "13:00" },
     { id: "tarde",  nombre: "Hora pico de la tarde",   hora: "17:30" }
   ];
+  var SENTIDOS = [
+    { id: "ida",    nombre: "Carchá → Cobán" },
+    { id: "vuelta", nombre: "Cobán → Carchá" }
+  ];
+  var estado = { sentido: "ida", franja: "manana" };
+  var datos = { antes: [], despues: [] };
 
   function franjaDeHora(h) { return h === "07:30" ? "manana" : h === "13:00" ? "valle" : "tarde"; }
   function fmt(n) { return n.toFixed(1).replace(".", ","); }
@@ -176,26 +192,55 @@
   }
 
   Promise.all([cargar("historico_antes.csv"), cargar("datos_despues.csv")]).then(function (res) {
-    var antes = res[0].map(function (r) {
-      return { fecha: r.fecha, franja: franjaDeHora(r.hora), min: parseFloat(r.tiempo_viaje_minutos) };
+    datos.antes = res[0].map(function (r) {
+      return { fecha: r.fecha, franja: franjaDeHora(r.hora), sentido: r.sentido || "ida", min: parseFloat(r.tiempo_viaje_minutos) };
     }).filter(function (r) { return isFinite(r.min); });
 
-    var despues = res[1].map(function (r) {
-      return { fecha: r.fecha, hora: r.hora_medicion, franja: r.franja, min: parseFloat(r.tiempo_viaje_minutos) };
+    datos.despues = res[1].map(function (r) {
+      return { fecha: r.fecha, hora: r.hora_medicion, franja: r.franja, sentido: r.sentido || "ida", min: parseFloat(r.tiempo_viaje_minutos) };
     }).filter(function (r) { return isFinite(r.min); });
 
-    var st = {};
-    FRANJAS.forEach(function (f) {
-      var a = antes.filter(function (r) { return r.franja === f.id; }).map(function (r) { return r.min; });
-      var d = despues.filter(function (r) { return r.franja === f.id; }).map(function (r) { return r.min; });
-      st[f.id] = { a: media(a), na: a.length, d: media(d), nd: d.length };
+    crearSelector("sentidos", SENTIDOS, "sentido", function (s) { return s.nombre; });
+    crearSelector("botones", FRANJAS, "franja", function (f) { return f.nombre + " (" + f.hora + ")"; });
+    pintarTodo();
+    pintarPie();
+  });
+
+  function crearSelector(contId, opciones, clave, etiqueta) {
+    var cont = document.getElementById(contId);
+    opciones.forEach(function (op) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = etiqueta(op);
+      b.setAttribute("aria-pressed", estado[clave] === op.id ? "true" : "false");
+      b.addEventListener("click", function () {
+        estado[clave] = op.id;
+        cont.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
+        b.setAttribute("aria-pressed", "true");
+        pintarTodo();
+      });
+      cont.appendChild(b);
     });
+  }
 
+  function delSentido(lista) { return lista.filter(function (r) { return r.sentido === estado.sentido; }); }
+
+  function estadisticas() {
+    var a = delSentido(datos.antes), d = delSentido(datos.despues), st = {};
+    FRANJAS.forEach(function (f) {
+      var va = a.filter(function (r) { return r.franja === f.id; }).map(function (r) { return r.min; });
+      var vd = d.filter(function (r) { return r.franja === f.id; }).map(function (r) { return r.min; });
+      st[f.id] = { a: media(va), na: va.length, d: media(vd), nd: vd.length };
+    });
+    return st;
+  }
+
+  function pintarTodo() {
+    var st = estadisticas();
     pintarVeredicto(st);
     pintarCarriles(st);
-    pintarBotones(st, despues);
-    pintarPie(antes, despues);
-  });
+    dibujar(st);
+  }
 
   function pintarVeredicto(st) {
     var deltas = [], pct = [];
@@ -204,20 +249,23 @@
       if (s.a !== null && s.d !== null) { deltas.push(s.d - s.a); pct.push((s.d - s.a) / s.a * 100); }
     });
     var el = document.getElementById("veredicto");
+    var nombre = SENTIDOS.filter(function (s) { return s.id === estado.sentido; })[0].nombre;
     if (!deltas.length) {
-      el.innerHTML = "<strong>Aún no hay datos para comparar.</strong><span>La primera medición del «después» aparece tras la siguiente ejecución programada.</span>";
+      el.className = "veredicto";
+      el.innerHTML = "<strong>Aún no hay datos para comparar en " + nombre + ".</strong><span>La primera medición del «después» aparece tras la siguiente ejecución programada.</span>";
       return;
     }
     var d = media(deltas), p = media(pct);
+    var pie = "<span>" + nombre + ". Promedio de los horarios con datos antes y después.</span>";
     if (Math.abs(p) < 2) {
       el.className = "veredicto";
-      el.innerHTML = "<strong>Sin cambio claro en el tiempo de viaje.</strong><span>La diferencia promedio es de " + fmt(Math.abs(d)) + " min (" + fmt(Math.abs(p)) + " %).</span>";
+      el.innerHTML = "<strong>Sin cambio claro en el tiempo de viaje (" + fmt(Math.abs(d)) + " min, " + fmt(Math.abs(p)) + " %).</strong>" + pie;
     } else if (d < 0) {
       el.className = "veredicto mejor";
-      el.innerHTML = "<strong>El viaje tarda " + fmt(Math.abs(d)) + " min menos en promedio (" + fmt(Math.abs(p)) + " %).</strong><span>Comparación entre los horarios que ya tienen datos antes y después.</span>";
+      el.innerHTML = "<strong>El viaje tarda " + fmt(Math.abs(d)) + " min menos en promedio (" + fmt(Math.abs(p)) + " %).</strong>" + pie;
     } else {
       el.className = "veredicto peor";
-      el.innerHTML = "<strong>El viaje tarda " + fmt(d) + " min más en promedio (" + fmt(p) + " %).</strong><span>Comparación entre los horarios que ya tienen datos antes y después.</span>";
+      el.innerHTML = "<strong>El viaje tarda " + fmt(d) + " min más en promedio (" + fmt(p) + " %).</strong>" + pie;
     }
   }
 
@@ -230,13 +278,11 @@
     });
     var cont = document.getElementById("carriles");
     cont.innerHTML = "";
-
     FRANJAS.forEach(function (f) {
-      var s = st[f.id];
-      var cambio = "";
+      var s = st[f.id], cambio = "";
       if (s.a !== null && s.d !== null) {
         var d = s.d - s.a, p = d / s.a * 100;
-        if (Math.abs(p) < 2) cambio = '<div class="cambio igual">Sin cambio claro (' + fmt(Math.abs(d)) + ' min)</div>';
+        if (Math.abs(p) < 2) cambio = '<div class="cambio igual">Sin cambio claro (' + fmt(Math.abs(d)) + " min)</div>";
         else if (d < 0) cambio = '<div class="cambio mejor">' + fmt(Math.abs(d)) + " min menos (" + fmt(Math.abs(p)) + " %)</div>";
         else cambio = '<div class="cambio peor">' + fmt(d) + " min más (" + fmt(p) + " %)</div>";
       }
@@ -249,8 +295,6 @@
         cambio;
       cont.appendChild(div);
     });
-
-    // Animar el ancho de las barras una sola vez
     requestAnimationFrame(function () {
       document.querySelectorAll(".barra[data-w]").forEach(function (b) { b.style.width = b.getAttribute("data-w") + "%"; });
     });
@@ -262,28 +306,11 @@
     return '<div class="barra ' + tipo + '" data-w="' + w.toFixed(1) + '"><span class="num">' + fmt(valor) + " min</span></div>";
   }
 
-  function pintarBotones(st, despues) {
-    var cont = document.getElementById("botones");
-    FRANJAS.forEach(function (f, i) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = f.nombre + " (" + f.hora + ")";
-      b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
-      b.addEventListener("click", function () {
-        cont.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", "false"); });
-        b.setAttribute("aria-pressed", "true");
-        dibujar(f.id, st, despues);
-      });
-      cont.appendChild(b);
-    });
-    dibujar(FRANJAS[0].id, st, despues);
-  }
-
-  function dibujar(id, st, despues) {
-    var cont = document.getElementById("grafica");
-    var pts = despues.filter(function (r) { return r.franja === id; })
+  function dibujar(st) {
+    var cont = document.getElementById("grafica"), id = estado.franja;
+    var pts = delSentido(datos.despues).filter(function (r) { return r.franja === id; })
       .sort(function (a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; });
-    if (!pts.length) { cont.innerHTML = '<div class="vacio">Aún no hay mediciones para este horario.</div>'; return; }
+    if (!pts.length) { cont.innerHTML = '<div class="vacio">Aún no hay mediciones para este horario y sentido.</div>'; return; }
 
     var base = st[id].a;
     var W = 640, H = 250, L = 46, R = 16, T = 16, B = 30;
@@ -292,7 +319,6 @@
     var ymin = Math.floor(Math.min.apply(null, vals) - 1);
     var ymax = Math.ceil(Math.max.apply(null, vals) + 1);
     var t0 = Date.parse(pts[0].fecha), t1 = Date.parse(pts[pts.length - 1].fecha);
-
     function x(p) { return t1 === t0 ? (L + (W - R)) / 2 : L + (Date.parse(p.fecha) - t0) / (t1 - t0) * (W - L - R); }
     function y(v) { return T + (ymax - v) / (ymax - ymin) * (H - T - B); }
 
@@ -317,10 +343,10 @@
     cont.innerHTML = s;
   }
 
-  function pintarPie(antes, despues) {
-    var ult = despues.length ? despues[despues.length - 1] : null;
+  function pintarPie() {
+    var d = datos.despues, ult = d.length ? d[d.length - 1] : null;
     document.getElementById("pie").textContent =
-      antes.length + " consultas del «antes» · " + despues.length + " mediciones del «después»" +
+      datos.antes.length + " consultas del «antes» · " + d.length + " mediciones del «después» (ambos sentidos)" +
       (ult ? " · última medición: " + ult.fecha + " " + ult.hora : "") + ". Datos: Google Routes API.";
   }
 })();
