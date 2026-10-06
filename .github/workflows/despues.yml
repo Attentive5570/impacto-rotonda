@@ -35,6 +35,7 @@ jobs:
         run: python extraer_despues.py
 
       - name: Guardar medición en el repositorio
+        if: always()   # guarda lo obtenido aunque el paso anterior termine con error
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
