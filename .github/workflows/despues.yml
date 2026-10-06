@@ -31,6 +31,7 @@ jobs:
       - name: Consultar tráfico actual
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          PYTHONUNBUFFERED: "1"   # muestra el avance en el log en tiempo real
         run: python extraer_despues.py
 
       - name: Guardar medición en el repositorio
@@ -44,5 +45,4 @@ jobs:
             git commit -m "Nueva medición del escenario Después"
             git pull --rebase
             git push
-
           fi
