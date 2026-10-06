@@ -1,46 +1,36 @@
 #!/usr/bin/env python3
-"""Escenario "Antes" (TomTom Routing API) - San Pedro Carchá -> Cobán.
+"""Escenario "Antes" con Google Routes API - San Pedro Carchá -> rotonda -> Cobán.
 
-Genera consultas para todos los días hábiles de los meses de referencia y guarda los resultados
-en historico_antes_tomtom.csv. Se puede relanzar: continúa donde se quedó.
+Google no entrega datos de fechas pasadas. Por eso cada día hábil de agosto y
+septiembre de 2026 se consulta en una fecha FUTURA con el mismo día de la semana
+y la misma hora; Google responde con su predicción basada en el historial de
+tráfico de la vía. Se guarda la fecha original.
+
+DATOS CONGELADOS: el script nunca modifica ni borra filas ya guardadas; solo
+agrega las que falten. Cuando el archivo está completo, termina sin tocarlo.
+Cada fila registra la fecha en que se extrajo, como evidencia para el informe.
 """
 
 import csv
 import os
 import sys
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 
-import requests
+from rutas_google import DIAS, ROTONDA, ZONA_HORARIA, consultar_ruta
 
-# ===================== CONFIGURACIÓN =====================
-TOMTOM_API_KEY = os.getenv("TOMTOM_API_KEY", "")
-
-ORIGEN = "15.4855,-90.3015"    # San Pedro Carchá
-DESTINO = "15.4694,-90.3792"   # Cobán
-URL = f"https://api.tomtom.com/routing/1/calculateRoute/{ORIGEN}:{DESTINO}/json"
-
-# Meses de referencia del "Antes" (rotonda aún no en uso): agosto y septiembre de 2026
+# Meses de referencia del "Antes" (rotonda aún no en uso)
 MESES = [(2026, 8), (2026, 9)]
 HORAS = [(7, 30, True), (13, 0, False), (17, 30, True)]  # (hora, minuto, es_pico)
-ZONA_HORARIA = timezone(timedelta(hours=-6))  # Guatemala: UTC-6, sin horario de verano
 
-# La API suele rechazar fechas pasadas. Con True se consultan las mismas fechas
-# desplazadas a futuro en bloques de 7 días (mismo día de la semana y hora),
-# y en el CSV se guarda la fecha original. El resultado es una PREDICCIÓN de
-# TomTom basada en patrones típicos, no una medición real de ese mes.
-PROYECTAR_A_FUTURO = True
-
-ARCHIVO_CSV = "historico_antes_tomtom.csv"
-COLUMNAS = ["fecha", "hora", "dia_semana", "es_hora_pico", "distancia_km", "tiempo_viaje_minutos"]
-DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+ARCHIVO_CSV = "historico_antes.csv"
+COLUMNAS = ["fecha", "hora", "dia_semana", "es_hora_pico", "distancia_km",
+            "tiempo_viaje_minutos", "tiempo_sin_trafico_minutos", "fecha_extraccion"]
 PAUSA_SEGUNDOS = 1
-REINTENTOS = 2
-# =========================================================
 
 
 def dias_laborales(meses):
-    """Devuelve los días de lunes a viernes de cada (año, mes) indicado."""
+    """Días de lunes a viernes de cada (año, mes)."""
     for anio, mes in meses:
         dia = date(anio, mes, 1)
         while dia.month == mes:
@@ -51,62 +41,23 @@ def dias_laborales(meses):
 
 def generar_muestras(meses):
     """
-    Genera (fecha, hora, es_pico, timestamp ISO 8601).
-    El timestamp se arma uniendo la fecha, la hora fija (07:30, 13:00, 17:30)
-    y la zona horaria de Guatemala, p. ej. 2025-10-01T07:30:00-06:00.
-    Con PROYECTAR_A_FUTURO se suma el MISMO número de semanas completas a todas
-    las fechas (calculado desde el primer mes), así conservan el día de la semana
-    y ninguna consulta cae en el pasado ni se repite.
+    Devuelve (fecha original, hora, es_pico, fecha de consulta).
+    La fecha original se arma con la hora fija y la zona de Guatemala
+    (p. ej. 2026-08-03 07:30 -06:00). A todas se les suma el MISMO número de
+    semanas completas para que caigan en el futuro sin cambiar el día de la semana.
     """
-    desplazamiento = timedelta(0)
-    if PROYECTAR_A_FUTURO:
-        hoy = datetime.now(ZONA_HORARIA).date()
-        primer_mes = min(meses)
-        semanas = ((hoy - date(primer_mes[0], primer_mes[1], 1)).days // 7) + 2
-        desplazamiento = timedelta(days=7 * semanas)
+    hoy = datetime.now(ZONA_HORARIA).date()
+    primer = min(meses)
+    semanas = ((hoy - date(primer[0], primer[1], 1)).days // 7) + 2
+    desplazamiento = timedelta(days=7 * semanas)
 
     for dia in dias_laborales(meses):
         for hora, minuto, es_pico in HORAS:
             original = datetime(dia.year, dia.month, dia.day, hora, minuto, tzinfo=ZONA_HORARIA)
-            consulta = original + desplazamiento
-            yield dia, original.strftime("%H:%M"), es_pico, consulta.isoformat()
-
-
-def consultar_tomtom(depart_at):
-    """GET a TomTom; devuelve (distancia_km, minutos) o lanza RuntimeError."""
-    params = {
-        "key": TOMTOM_API_KEY,
-        "departAt": depart_at,
-        "traffic": "true",
-        "travelMode": "car",
-        "routeType": "fastest",
-    }
-    ultimo_error = None
-    for intento in range(REINTENTOS + 1):
-        try:
-            r = requests.get(URL, params=params, timeout=30)
-            if r.status_code == 429:  # límite de tasa: esperar y reintentar
-                ultimo_error = "429 Too Many Requests"
-                time.sleep(5 * (intento + 1))
-                continue
-            r.raise_for_status()
-            resumen = r.json()["routes"][0]["summary"]
-            return (
-                round(resumen["lengthInMeters"] / 1000, 3),
-                round(resumen["travelTimeInSeconds"] / 60, 2),
-            )
-        except (requests.RequestException, KeyError, IndexError, ValueError) as e:
-            detalle = ""
-            if isinstance(e, requests.HTTPError) and e.response is not None:
-                detalle = f" | {e.response.text[:200]}"
-            # Nunca imprimir la URL completa: contiene la API key
-            ultimo_error = f"{type(e).__name__}{detalle}"
-            time.sleep(2)
-    raise RuntimeError(ultimo_error)
+            yield dia, original.strftime("%H:%M"), es_pico, original + desplazamiento
 
 
 def cargar_procesados():
-    """Lee el CSV existente para no repetir consultas."""
     if not os.path.exists(ARCHIVO_CSV):
         return set()
     with open(ARCHIVO_CSV, newline="", encoding="utf-8") as f:
@@ -114,13 +65,20 @@ def cargar_procesados():
 
 
 def main():
-    if not TOMTOM_API_KEY:
-        sys.exit("Falta la variable de entorno TOMTOM_API_KEY.")
+    if not ROTONDA:
+        print("AVISO: ROTONDA no está definida en rutas_google.py; la ruta no se fuerza por la rotonda.")
 
     procesados = cargar_procesados()
     nuevo = not os.path.exists(ARCHIVO_CSV)
     muestras = list(generar_muestras(MESES))
+    pendientes = [m for m in muestras if (m[0].isoformat(), m[1]) not in procesados]
     print(f"{len(muestras)} consultas planificadas, {len(procesados)} ya guardadas.")
+
+    if not pendientes:
+        print("El escenario Antes ya está completo y congelado. No se modifica nada.")
+        return
+
+    hoy = datetime.now(ZONA_HORARIA).date().isoformat()
 
     errores = 0
     with open(ARCHIVO_CSV, "a", newline="", encoding="utf-8") as f:
@@ -128,27 +86,24 @@ def main():
         if nuevo:
             escritor.writeheader()
 
-        for i, (dia, hora, es_pico, ts) in enumerate(muestras, 1):
-            if (dia.isoformat(), hora) in procesados:
+        for i, (dia, hora, es_pico, salida) in enumerate(muestras, 1):
+            if (dia.isoformat(), hora) in procesados:  # nunca se reescribe lo guardado
                 continue
             try:
-                km, minutos = consultar_tomtom(ts)
-            except Exception as e:  # no detener el script: el progreso ya está guardado
+                datos = consultar_ruta(salida)
+            except Exception as e:  # no detener: lo guardado se conserva
                 errores += 1
                 print(f"[{i}/{len(muestras)}] ERROR {dia} {hora}: {e}")
+                if "GOOGLE_MAPS_API_KEY" in str(e):
+                    sys.exit(1)
                 time.sleep(PAUSA_SEGUNDOS)
                 continue
 
-            escritor.writerow({
-                "fecha": dia.isoformat(),
-                "hora": hora,
-                "dia_semana": DIAS[dia.weekday()],
-                "es_hora_pico": es_pico,
-                "distancia_km": km,
-                "tiempo_viaje_minutos": minutos,
-            })
+            escritor.writerow({"fecha": dia.isoformat(), "hora": hora,
+                               "dia_semana": DIAS[dia.weekday()], "es_hora_pico": es_pico, **datos,
+                               "fecha_extraccion": hoy})
             f.flush()
-            print(f"[{i}/{len(muestras)}] {dia} {hora} -> {km} km, {minutos} min")
+            print(f"[{i}/{len(muestras)}] {dia} {hora} -> {datos}")
             time.sleep(PAUSA_SEGUNDOS)
 
     print(f"Listo. Errores: {errores}. Resultados en {ARCHIVO_CSV}")
